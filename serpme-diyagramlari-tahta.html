@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Serpme Diyagramları - Sıralı Eksen Animasyonları</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        html, body {
+            height: 100%;
+            overflow: hidden; /* akıllı tahtada kaydırma olmasın */
+        }
+        body {
+            background-color: #f4f6f9;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            padding: 1.2vh 1.2vw;
+            gap: 1vh;
+        }
+        header {
+            flex: 0 0 auto;
+            text-align: center;
+        }
+        header h1 {
+            color: #1e3a8a;
+            font-size: clamp(1rem, 2.6vh, 1.9rem);
+            margin-bottom: 2px;
+        }
+        header p {
+            color: #64748b;
+            font-size: clamp(0.7rem, 1.4vh, 0.95rem);
+        }
+
+        /* Ana pano: 3 sütun, tüm yükseklik burada dağıtılıyor */
+        .board {
+            flex: 1 1 auto;
+            min-height: 0;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0 1.6vw;
+        }
+        .column {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            gap: 1.4vh;
+        }
+        .column h2 {
+            flex: 0 0 auto;
+            font-size: clamp(0.85rem, 1.7vh, 1.15rem);
+            font-weight: bold;
+            color: #1e3a8a;
+            border-bottom: 2px solid #cbd5e1;
+            padding-bottom: 0.4vh;
+        }
+
+        .card {
+            flex: 1 1 0;
+            min-height: 0;
+            background: #fff;
+            border-radius: 10px;
+            padding: 0.8vh 0.8vw;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.05);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .card:hover {
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+            border-color: #3b82f6;
+        }
+        .card.active {
+            border-color: #2563eb;
+            background-color: #f0f7ff;
+        }
+        .card-title {
+            flex: 0 0 auto;
+            font-weight: bold;
+            font-size: clamp(0.6rem, 1.2vh, 0.9rem);
+            color: #1e293b;
+            margin-bottom: 0.3vh;
+            text-align: center;
+        }
+        .plot-container {
+            position: relative;
+            flex: 1 1 auto;
+            width: 62%;
+            min-height: 0;
+            aspect-ratio: 1 / 1;
+            max-height: 62%;
+            max-width: 62%;
+            background: #fafafa;
+            border-left: 2px solid #333;
+            border-bottom: 2px solid #333;
+            margin: 0.6vh auto;
+        }
+        .axis-label-x {
+            position: absolute;
+            bottom: -1.8vh;
+            right: 3%;
+            font-weight: bold;
+            font-size: clamp(0.6rem, 1.1vh, 0.85rem);
+            color: #333;
+        }
+        .axis-label-y {
+            position: absolute;
+            top: -0.3vh;
+            left: -1.8vh;
+            font-weight: bold;
+            font-size: clamp(0.6rem, 1.1vh, 0.85rem);
+            color: #333;
+        }
+        svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+        .dot {
+            fill: #ef4444;
+        }
+        .trend-line {
+            stroke: #3b82f6;
+            stroke-width: 2;
+            stroke-dasharray: 4;
+            opacity: 0.7;
+        }
+
+        /* Kutusuz Kayan Oklar (vmin ile ölçekli, kutu boyutuyla birlikte büyüyüp küçülür) */
+        .floating-arrow {
+            position: absolute;
+            font-size: clamp(0.9rem, 2.2vh, 1.4rem);
+            font-weight: 900;
+            color: #059669;
+            opacity: 0;
+            user-select: none;
+            z-index: 10;
+        }
+        /*
+          TEK DÖNGÜ SÜRESİ: 6 SANİYE
+          0%     - 33.33% (0s-2s) : Sadece X oku hareket eder
+          33.33% - 66.66% (2s-4s) : X oku kaybolur, sadece Y oku hareket eder
+          66.66% - 100%   (4s-6s) : X ve Y okları BİRLİKTE hareket eder
+        */
+        .card.active .floating-arrow {
+            animation-iteration-count: infinite;
+            animation-timing-function: linear;
+            animation-duration: 6s;
+        }
+
+        /* Aşama 1 konumları: Sadece X — kutu genişliği kadar (width:100%), taşma olmasın diye kutunun içinde kalır */
+        .card.active .only-x-right {
+            bottom: -2.6vh; left: 0; width: 100%; text-align: left;
+            animation-name: onlyXRight;
+        }
+        .card.active .only-x-left {
+            bottom: -2.6vh; left: 0; width: 100%; text-align: right;
+            animation-name: onlyXLeft;
+        }
+
+        /* Aşama 2 konumları: Sadece Y — kutu yüksekliği kadar (height:100%) */
+        .card.active .only-y-up {
+            left: -2.6vh; top: 0; height: 100%; display: flex; align-items: flex-end;
+            animation-name: onlyYUp;
+        }
+        .card.active .only-y-down {
+            left: -2.6vh; top: 0; height: 100%; display: flex; align-items: flex-start;
+            animation-name: onlyYDown;
+        }
+
+        /* Aşama 3 konumları: X ve Y birlikte */
+        .card.active .both-x-right {
+            bottom: -2.6vh; left: 0; width: 100%; text-align: left;
+            animation-name: bothXRight;
+        }
+        .card.active .both-x-left {
+            bottom: -2.6vh; left: 0; width: 100%; text-align: right;
+            animation-name: bothXLeft;
+        }
+        .card.active .both-y-up {
+            left: -2.6vh; top: 0; height: 100%; display: flex; align-items: flex-end;
+            animation-name: bothYUp;
+        }
+        .card.active .both-y-down {
+            left: -2.6vh; top: 0; height: 100%; display: flex; align-items: flex-start;
+            animation-name: bothYDown;
+        }
+
+        /* Kayma mesafeleri artık kutunun kendi genişliğinin/yüksekliğinin (%) yüzdesi olarak
+           tanımlı (width/height: 100% sayesinde), bu yüzden ok hiçbir zaman kutunun dışına
+           taşıp komşu grafiğe girmiyor. */
+        @keyframes onlyXRight {
+            0%      { transform: translateX(0);   opacity: 0.1; }
+            16.665% { transform: translateX(45%); opacity: 1; }
+            33.33%  { transform: translateX(88%); opacity: 0; }
+            33.34%  { transform: translateX(0);   opacity: 0; }
+            100%    { transform: translateX(0);   opacity: 0; }
+        }
+        @keyframes onlyXLeft {
+            0%      { transform: translateX(0);    opacity: 0.1; }
+            16.665% { transform: translateX(-45%); opacity: 1; }
+            33.33%  { transform: translateX(-88%); opacity: 0; }
+            33.34%  { transform: translateX(0);    opacity: 0; }
+            100%    { transform: translateX(0);    opacity: 0; }
+        }
+        @keyframes onlyYUp {
+            0%      { transform: translateY(0);   opacity: 0; }
+            33.33%  { transform: translateY(0);   opacity: 0; }
+            33.34%  { transform: translateY(0);   opacity: 0.1; }
+            50%     { transform: translateY(-45%); opacity: 1; }
+            66.66%  { transform: translateY(-88%); opacity: 0; }
+            66.67%  { transform: translateY(0);   opacity: 0; }
+            100%    { transform: translateY(0);   opacity: 0; }
+        }
+        @keyframes onlyYDown {
+            0%      { transform: translateY(0);  opacity: 0; }
+            33.33%  { transform: translateY(0);  opacity: 0; }
+            33.34%  { transform: translateY(0);  opacity: 0.1; }
+            50%     { transform: translateY(45%); opacity: 1; }
+            66.66%  { transform: translateY(88%); opacity: 0; }
+            66.67%  { transform: translateY(0);  opacity: 0; }
+            100%    { transform: translateY(0);  opacity: 0; }
+        }
+        @keyframes bothXRight {
+            0%      { transform: translateX(0);   opacity: 0; }
+            66.66%  { transform: translateX(0);   opacity: 0; }
+            66.67%  { transform: translateX(0);   opacity: 0.1; }
+            83.33%  { transform: translateX(45%); opacity: 1; }
+            100%    { transform: translateX(88%); opacity: 0.1; }
+        }
+        @keyframes bothXLeft {
+            0%      { transform: translateX(0);    opacity: 0; }
+            66.66%  { transform: translateX(0);    opacity: 0; }
+            66.67%  { transform: translateX(0);    opacity: 0.1; }
+            83.33%  { transform: translateX(-45%); opacity: 1; }
+            100%    { transform: translateX(-88%); opacity: 0.1; }
+        }
+        @keyframes bothYUp {
+            0%      { transform: translateY(0);    opacity: 0; }
+            66.66%  { transform: translateY(0);    opacity: 0; }
+            66.67%  { transform: translateY(0);    opacity: 0.1; }
+            83.33%  { transform: translateY(-45%); opacity: 1; }
+            100%    { transform: translateY(-88%); opacity: 0.1; }
+        }
+        @keyframes bothYDown {
+            0%      { transform: translateY(0);   opacity: 0; }
+            66.66%  { transform: translateY(0);   opacity: 0; }
+            66.67%  { transform: translateY(0);   opacity: 0.1; }
+            83.33%  { transform: translateY(45%); opacity: 1; }
+            100%    { transform: translateY(88%); opacity: 0.1; }
+        }
+
+        .no-relation-card {
+            flex: 1.4 1 0;
+        }
+        .info-box {
+            flex: 1.6 1 0;
+            min-height: 0;
+            background: #fff;
+            padding: 0.8vh 0.8vw;
+            border-radius: 8px;
+            text-align: center;
+            color: #475569;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+            border-left: 4px solid #3b82f6;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            justify-content: center;
+            gap: 0.6vh;
+            overflow: hidden;
+        }
+        .scale-title {
+            font-size: clamp(0.6rem, 1.1vh, 0.85rem);
+            font-weight: bold;
+            color: #1e3a8a;
+        }
+        .scale-track {
+            position: relative;
+            display: flex;
+            width: 100%;
+            height: 1.6vh;
+            border-radius: 4px;
+            overflow: visible;
+        }
+        .seg {
+            height: 100%;
+            background: #cbd5e1;
+            opacity: 0.55;
+            transition: opacity 0.25s ease, box-shadow 0.25s ease;
+        }
+        .seg:first-child { border-radius: 4px 0 0 4px; }
+        .seg:last-child { border-radius: 0 4px 4px 0; }
+        .seg-neg-guclu, .seg-pos-guclu { flex: 0.3; background: #ef4444; }
+        .seg-neg-orta,  .seg-pos-orta  { flex: 0.4; background: #1e293b; }
+        .seg-neg-zayif, .seg-pos-zayif { flex: 0.3; background: #0ea5e9; }
+        .seg.active-seg {
+            opacity: 1;
+            box-shadow: 0 0 0 2px #fff, 0 0 0 4px #059669;
+        }
+        .zero-marker {
+            position: absolute;
+            left: 50%;
+            top: -0.5vh;
+            width: 0.9vh;
+            height: 2.6vh;
+            transform: translateX(-50%);
+            background: #94a3b8;
+            border-radius: 2px;
+            opacity: 0.55;
+            transition: opacity 0.25s ease, box-shadow 0.25s ease;
+        }
+        .zero-marker.active-seg {
+            opacity: 1;
+            background: #059669;
+            box-shadow: 0 0 0 2px #fff, 0 0 0 4px #059669;
+        }
+        .scale-ticks {
+            display: flex;
+            justify-content: space-between;
+            font-size: clamp(0.5rem, 0.95vh, 0.75rem);
+            color: #64748b;
+        }
+        .range-text {
+            font-size: clamp(0.6rem, 1.15vh, 0.85rem);
+            font-weight: bold;
+            color: #1e293b;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Serpme Diyagramları ve Eksen İlişkileri</h1>
+        <p>Grafiğe tıklayın: 1. Önce sadece X ekseni oku hareket eder ➔ 2. X oku kaybolur, sadece Y ekseni oku hareket eder ➔ 3. En son X ve Y okları birlikte hareket eder.</p>
+    </header>
+
+    <div class="board" id="gridContainer">
+
+        <!-- Pozitif İlişki -->
+        <div class="column">
+            <h2>Pozitif İlişki</h2>
+
+            <div class="card" onclick="activateCard(this, 'Pozitif Güçlü İlişki')">
+                <div class="card-title">Grafik 1: Güçlü İlişki</div>
+                <div class="plot-container">
+                    <span class="axis-label-x">x</span>
+                    <span class="axis-label-y">y</span>
+                    <div class="floating-arrow only-x-right">➔</div>
+                    <div class="floating-arrow only-y-up">⬆</div>
+                    <div class="floating-arrow both-x-right">➔</div>
+                    <div class="floating-arrow both-y-up">⬆</div>
+                    <svg viewBox="0 0 200 200">
+                        <line x1="20" y1="180" x2="180" y2="20" class="trend-line" />
+                        <circle cx="30" cy="160" r="5" class="dot"/><circle cx="45" cy="145" r="5" class="dot"/><circle cx="60" cy="130" r="5" class="dot"/><circle cx="75" cy="115" r="5" class="dot"/><circle cx="90" cy="100" r="5" class="dot"/><circle cx="105" cy="85" r="5" class="dot"/><circle cx="120" cy="70" r="5" class="dot"/><circle cx="135" cy="55" r="5" class="dot"/><circle cx="150" cy="40" r="5" class="dot"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="card" onclick="activateCard(this, 'Pozitif Orta İlişki')">
+                <div class="card-title">Grafik 2: Orta İlişki</div>
+                <div class="plot-container">
+                    <span class="axis-label-x">x</span>
+                    <span class="axis-label-y">y</span>
+                    <div class="floating-arrow only-x-right">➔</div>
+                    <div class="floating-arrow only-y-up">⬆</div>
+                    <div class="floating-arrow both-x-right">➔</div>
+                    <div class="floating-arrow both-y-up">⬆</div>
+                    <svg viewBox="0 0 200 200">
+                        <line x1="20" y1="170" x2="180" y2="30" class="trend-line" />
+                        <circle cx="35" cy="170" r="5" class="dot"/><circle cx="40" cy="135" r="5" class="dot"/><circle cx="65" cy="140" r="5" class="dot"/><circle cx="70" cy="110" r="5" class="dot"/><circle cx="95" cy="115" r="5" class="dot"/><circle cx="105" cy="80" r="5" class="dot"/><circle cx="125" cy="90" r="5" class="dot"/><circle cx="140" cy="50" r="5" class="dot"/><circle cx="165" cy="45" r="5" class="dot"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="card" onclick="activateCard(this, 'Pozitif Zayıf İlişki')">
+                <div class="card-title">Grafik 3: Zayıf İlişki</div>
+                <div class="plot-container">
+                    <span class="axis-label-x">x</span>
+                    <span class="axis-label-y">y</span>
+                    <div class="floating-arrow only-x-right">➔</div>
+                    <div class="floating-arrow only-y-up">⬆</div>
+                    <div class="floating-arrow both-x-right">➔</div>
+                    <div class="floating-arrow both-y-up">⬆</div>
+                    <svg viewBox="0 0 200 200">
+                        <line x1="20" y1="160" x2="180" y2="60" class="trend-line" />
+                        <circle cx="30" cy="180" r="5" class="dot"/><circle cx="45" cy="110" r="5" class="dot"/><circle cx="60" cy="150" r="5" class="dot"/><circle cx="80" cy="70" r="5" class="dot"/><circle cx="100" cy="130" r="5" class="dot"/><circle cx="115" cy="45" r="5" class="dot"/><circle cx="135" cy="100" r="5" class="dot"/><circle cx="160" cy="85" r="5" class="dot"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Negatif İlişki -->
+        <div class="column">
+            <h2>Negatif İlişki</h2>
+
+            <div class="card" onclick="activateCard(this, 'Negatif Güçlü İlişki')">
+                <div class="card-title">Grafik 4: Güçlü İlişki</div>
+                <div class="plot-container">
+                    <span class="axis-label-x">x</span>
+                    <span class="axis-label-y">y</span>
+                    <div class="floating-arrow only-x-right">➔</div>
+                    <div class="floating-arrow only-y-down">⬇</div>
+                    <div class="floating-arrow both-x-right">➔</div>
+                    <div class="floating-arrow both-y-down">⬇</div>
+                    <svg viewBox="0 0 200 200">
+                        <line x1="20" y1="30" x2="180" y2="170" class="trend-line" />
+                        <circle cx="30" cy="40" r="5" class="dot"/><circle cx="45" cy="55" r="5" class="dot"/><circle cx="60" cy="70" r="5" class="dot"/><circle cx="75" cy="85" r="5" class="dot"/><circle cx="90" cy="100" r="5" class="dot"/><circle cx="105" cy="115" r="5" class="dot"/><circle cx="120" cy="130" r="5" class="dot"/><circle cx="135" cy="145" r="5" class="dot"/><circle cx="150" cy="160" r="5" class="dot"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="card" onclick="activateCard(this, 'Negatif Orta İlişki')">
+                <div class="card-title">Grafik 5: Orta İlişki</div>
+                <div class="plot-container">
+                    <span class="axis-label-x">x</span>
+                    <span class="axis-label-y">y</span>
+                    <div class="floating-arrow only-x-right">➔</div>
+                    <div class="floating-arrow only-y-down">⬇</div>
+                    <div class="floating-arrow both-x-right">➔</div>
+                    <div class="floating-arrow both-y-down">⬇</div>
+                    <svg viewBox="0 0 200 200">
+                        <line x1="20" y1="40" x2="180" y2="160" class="trend-line" />
+                        <circle cx="30" cy="50" r="5" class="dot"/><circle cx="45" cy="80" r="5" class="dot"/><circle cx="65" cy="75" r="5" class="dot"/><circle cx="75" cy="110" r="5" class="dot"/><circle cx="95" cy="100" r="5" class="dot"/><circle cx="110" cy="135" r="5" class="dot"/><circle cx="130" cy="125" r="5" class="dot"/><circle cx="155" cy="160" r="5" class="dot"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="card" onclick="activateCard(this, 'Negatif Zayıf İlişki')">
+                <div class="card-title">Grafik 6: Zayıf İlişki</div>
+                <div class="plot-container">
+                    <span class="axis-label-x">x</span>
+                    <span class="axis-label-y">y</span>
+                    <div class="floating-arrow only-x-right">➔</div>
+                    <div class="floating-arrow only-y-down">⬇</div>
+                    <div class="floating-arrow both-x-right">➔</div>
+                    <div class="floating-arrow both-y-down">⬇</div>
+                    <svg viewBox="0 0 200 200">
+                        <line x1="20" y1="50" x2="180" y2="150" class="trend-line" />
+                        <circle cx="35" cy="40" r="5" class="dot"/><circle cx="40" cy="130" r="5" class="dot"/><circle cx="65" cy="80" r="5" class="dot"/><circle cx="85" cy="160" r="5" class="dot"/><circle cx="100" cy="65" r="5" class="dot"/><circle cx="120" cy="140" r="5" class="dot"/><circle cx="145" cy="95" r="5" class="dot"/><circle cx="160" cy="150" r="5" class="dot"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- İlişki Yok + Bilgi Kutusu -->
+        <div class="column">
+            <h2>İlişki Yok</h2>
+
+            <div class="card no-relation-card" onclick="activateCard(this, 'İlişki Yok')">
+                <div class="card-title">Grafik 7: İlişki Yok</div>
+                <div class="plot-container">
+                    <span class="axis-label-x">x</span>
+                    <span class="axis-label-y">y</span>
+                    <svg viewBox="0 0 200 200">
+                        <circle cx="40" cy="50" r="5" class="dot"/><circle cx="70" cy="150" r="5" class="dot"/><circle cx="90" cy="40" r="5" class="dot"/><circle cx="120" cy="110" r="5" class="dot"/><circle cx="50" cy="100" r="5" class="dot"/><circle cx="140" cy="60" r="5" class="dot"/><circle cx="160" cy="160" r="5" class="dot"/><circle cx="80" cy="90" r="5" class="dot"/><circle cx="110" cy="170" r="5" class="dot"/><circle cx="150" cy="110" r="5" class="dot"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="info-box" id="infoText">
+                <div class="scale-title">Korelasyon Katsayısı (r)</div>
+                <div class="scale-track">
+                    <div class="seg seg-neg-guclu"></div>
+                    <div class="seg seg-neg-orta"></div>
+                    <div class="seg seg-neg-zayif"></div>
+                    <div class="seg seg-pos-zayif"></div>
+                    <div class="seg seg-pos-orta"></div>
+                    <div class="seg seg-pos-guclu"></div>
+                    <div class="zero-marker" id="zeroMarker"></div>
+                </div>
+                <div class="scale-ticks">
+                    <span>-1</span><span>-0,7</span><span>-0,3</span><span>0</span><span>0,3</span><span>0,7</span><span>1</span>
+                </div>
+                <div class="range-text" id="rangeText">Bir grafiğe tıklayın, r aralığı burada görünsün.</div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const rangeData = {
+            'Pozitif Güçlü İlişki': { seg: 'pos-guclu', text: 'r: 0,7 ile 1 arasında (Güçlü)' },
+            'Pozitif Orta İlişki':  { seg: 'pos-orta',  text: 'r: 0,3 ile 0,7 arasında (Orta)' },
+            'Pozitif Zayıf İlişki': { seg: 'pos-zayif', text: 'r: 0 ile 0,3 arasında (Zayıf)' },
+            'Negatif Güçlü İlişki': { seg: 'neg-guclu', text: 'r: -1 ile -0,7 arasında (Güçlü)' },
+            'Negatif Orta İlişki':  { seg: 'neg-orta',  text: 'r: -0,7 ile -0,3 arasında (Orta)' },
+            'Negatif Zayıf İlişki': { seg: 'neg-zayif', text: 'r: -0,3 ile 0 arasında (Zayıf)' },
+            'İlişki Yok':           { seg: 'zero',      text: 'r = 0 (İlişki Yok)' }
+        };
+
+        function activateCard(element, titleText) {
+            document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+            element.classList.add('active');
+
+            document.querySelectorAll('.seg, .zero-marker').forEach(s => s.classList.remove('active-seg'));
+
+            const data = rangeData[titleText];
+            if (data) {
+                if (data.seg === 'zero') {
+                    document.getElementById('zeroMarker').classList.add('active-seg');
+                } else {
+                    document.querySelector('.seg-' + data.seg).classList.add('active-seg');
+                }
+                document.getElementById('rangeText').textContent = data.text;
+            }
+        }
+    </script>
+</body>
+</html>
