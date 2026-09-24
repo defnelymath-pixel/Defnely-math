@@ -1,0 +1,748 @@
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Defnely Math - BSO ve Korelasyon Simülasyonu</title>
+    <!-- Chart.js Kütüphanesi -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js Annotation eklentisi -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.1.0"></script>
+    <style>
+        :root {
+            --primary: #0f172a;
+            --accent-blue: #2563eb;
+            --accent-green: #059669;
+            --accent-orange: #d97706;
+            --accent-purple: #7c3aed;
+            --bg: #f1f5f9;
+            --card-bg: #ffffff;
+            --border: #cbd5e1;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        html, body {
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            background-color: var(--bg);
+            color: #1e293b;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+        }
+
+        header h1 {
+            font-size: 1.2rem;
+            color: #fbbf24;
+        }
+
+        .channel-badge {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+            border: 1px solid #fbbf24;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        .app-container {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 15px;
+            padding: 15px;
+            flex: 1;
+            height: calc(100vh - 50px);
+            overflow: hidden;
+        }
+
+        .sidebar {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .panel-heading {
+            font-size: 0.95rem;
+            font-weight: bold;
+            color: var(--primary);
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 4px;
+        }
+
+        .btn-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .ctrl-btn {
+            width: 100%;
+            padding: 10px 12px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .ctrl-btn-blue { background-color: var(--accent-blue); color: white; }
+        .ctrl-btn-blue:hover { background-color: #1d4ed8; }
+
+        .ctrl-btn-green { background-color: var(--accent-green); color: white; }
+        .ctrl-btn-green:hover { background-color: #047857; }
+
+        .ctrl-btn-orange { background-color: var(--accent-orange); color: white; }
+        .ctrl-btn-orange:hover { background-color: #b45309; }
+
+        .ctrl-btn-purple { background-color: var(--accent-purple); color: white; }
+        .ctrl-btn-purple:hover { background-color: #6d28d9; }
+
+        .dropdown-container { position: relative; }
+        .dropdown-list {
+            display: none;
+            position: absolute;
+            top: 105%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.15);
+            z-index: 100;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .dropdown-list.open { display: block; }
+        .dropdown-item {
+            padding: 8px 10px;
+            font-size: 0.82rem;
+            border-bottom: 1px solid #f1f5f9;
+            cursor: pointer;
+        }
+        .dropdown-item:hover { background-color: #eff6ff; color: var(--accent-blue); font-weight: bold; }
+
+        .calc-output-box {
+            background: #fffbe3;
+            border: 2px dashed #f59e0b;
+            border-radius: 8px;
+            padding: 12px;
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+        }
+        .calc-output-box.visible { display: flex; }
+
+        .r-title { font-size: 1.05rem; font-weight: bold; color: #b45309; }
+        .r-text { font-size: 0.85rem; line-height: 1.4; color: #334155; }
+        
+        .bso-card {
+            background: #ffffff;
+            border: 1px solid #fcd34d;
+            border-radius: 6px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .bso-means {
+            font-size: 0.8rem;
+            color: #475569;
+            font-weight: 600;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 4px;
+        }
+        .region-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+        .region-badge {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 4px 6px;
+            font-size: 0.78rem;
+            color: #1e293b;
+        }
+        .formula-box {
+            background: #fef3c7;
+            border-radius: 4px;
+            padding: 6px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #92400e;
+            text-align: center;
+        }
+
+        .author-card {
+            margin-top: auto;
+            padding: 10px;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 0.78rem;
+            color: #475569;
+        }
+        .author-card strong { color: #0f172a; font-size: 0.85rem; }
+
+        .workspace {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .info-card {
+            background: var(--card-bg);
+            padding: 10px 14px;
+            border-radius: 8px;
+            border-left: 5px solid var(--accent-blue);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            flex-shrink: 0;
+        }
+        .info-card h2 { font-size: 1rem; color: #0f172a; }
+        .info-card p { font-size: 0.82rem; color: #64748b; margin-bottom: 4px; }
+        .info-card .note { font-size: 0.75rem; color: #94a3b8; font-style: italic; }
+
+        .view-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            flex: 1;
+            height: calc(100% - 60px);
+            overflow: hidden;
+        }
+
+        .panel-box {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+        .box-title { font-size: 0.9rem; font-weight: bold; color: var(--primary); margin-bottom: 6px; flex-shrink: 0; }
+
+        .table-scroll { flex: 1; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+        th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background-color: #f8fafc; color: #334155; position: sticky; top: 0; }
+
+        .chart-container { flex: 1; position: relative; width: 100%; height: 100%; }
+        .invisible-panel { visibility: hidden; opacity: 0; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>11. Sınıf İstatistiksel Araştırma Süreci</h1>
+        <div class="channel-badge">🎬 Defnely Math Özel İçeriğidir</div>
+    </header>
+
+    <div class="app-container">
+        
+        <!-- SOL TARAF: KONTROL PANELİ -->
+        <div class="sidebar">
+            <div class="panel-heading">Ders Kontrol Paneli</div>
+            
+            <div class="btn-stack">
+                <div class="dropdown-container">
+                    <button class="ctrl-btn ctrl-btn-blue" onclick="toggleDropdown()">
+                        <span>📋 Örnek Seçiniz</span>
+                        <span>▾</span>
+                    </button>
+                    <div id="dropdown-list" class="dropdown-list"></div>
+                </div>
+
+                <button class="ctrl-btn ctrl-btn-green" onclick="enableScatterPlot()">
+                    <span>📊 Serpme Grafiğini Aç</span>
+                    <span>►</span>
+                </button>
+
+                <button class="ctrl-btn ctrl-btn-orange" onclick="calculateCorrelation()">
+                    <span>🧮 Korelasyon Katsayısı (r)</span>
+                    <span>=</span>
+                </button>
+
+                <button class="ctrl-btn ctrl-btn-purple" onclick="calculateBSO()">
+                    <span>📐 Bölge Sayım Oranı (BSO)</span>
+                    <span>⊞</span>
+                </button>
+            </div>
+
+            <!-- BUTONLARIN ALTINDAKİ HESAPLAMA ÇIKTI KUTUSU -->
+            <div id="calc-output" class="calc-output-box">
+                <div id="r-val" class="r-title">İstatistiksel Analiz</div>
+                <div id="r-desc" class="r-text">Lütfen bir hesaplama yöntemi seçiniz.</div>
+                <div id="bso-card" class="bso-card" style="display:none;"></div>
+            </div>
+
+            <!-- KANAL VE LİSANS BİLGİ KARTININ EKLENDİĞİ ALAN -->
+            <div class="author-card">
+                📺 <strong>Defnely Math</strong><br>
+                <span style="font-size: 0.72rem; color: #64748b;">Bu materyal Defnely Math YouTube kanalı için özel olarak geliştirilmiştir. İzinsiz kopyalanamaz.</span>
+            </div>
+        </div>
+
+        <!-- SAĞ TARAF: ÇALIŞMA ALANI -->
+        <div class="workspace">
+            <div class="info-card">
+                <h2 id="ex-title">1. Örnek: Çalışma Süresi ve Sınav Başarısı</h2>
+                <p id="ex-desc">Öğrencilerin haftalık ortalama çalışma süreleri (saat) ile ders başarı puanları arasındaki ilişki.</p>
+                <div class="note">* Veriler ders anlatımı ve kavramsal modelleme amacıyla oluşturulmuştur.</div>
+            </div>
+
+            <div class="view-split">
+                <!-- TABLO -->
+                <div class="panel-box">
+                    <div class="box-title">📋 Örnek Veri Tablosu</div>
+                    <div class="table-scroll">
+                        <table id="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Gözlem Grubu</th>
+                                    <th id="th-x">Çalışma Süresi (Saat) [X]</th>
+                                    <th id="th-y">Ders Puanı (0-100) [Y]</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- SERPME GRAFİĞİ -->
+                <div id="chart-panel" class="panel-box invisible-panel">
+                    <div class="box-title" id="chart-title-text">📊 Serpme Diyagramı (Saçılım Grafiği)</div>
+                    <div class="chart-container">
+                        <canvas id="scatterChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const examples = [
+            {
+                id: 1,
+                title: "1. Örnek: Çalışma Süresi ve Sınav Başarısı",
+                desc: "Öğrencilerin haftalık ortalama çalışma süreleri (saat) ile ders başarı puanları arasındaki ilişki.",
+                unitX: "Çalışma Süresi (Saat)",
+                unitY: "Ders Puanı (0-100)",
+                bookRef: "Pozitif Orta İlişki",
+                data: [
+                    { label: "Furkan", x: 2, y: 45 }, { label: "Semih", x: 4, y: 55 },
+                    { label: "Arda", x: 5, y: 75 }, { label: "Merve", x: 7, y: 65 },
+                    { label: "Emir", x: 8, y: 88 }, { label: "Kaan", x: 10, y: 80 },
+                    { label: "Nilay", x: 3, y: 60 }, { label: "Naz", x: 6, y: 70 },
+                    { label: "Zeynep Beren", x: 9, y: 95 }, { label: "Nehir", x: 11, y: 85 }
+                ]
+            },
+            {
+                id: 2,
+                title: "2. Örnek: Eğitim Süresi ve Aylık Net Gelir",
+                desc: "Bireylerin eğitim süreleri (yıl) ile aylık ortalama net gelirleri (TL) arasındaki ilişkinin incelenmesi.",
+                unitX: "Eğitim Süresi (Yıl)",
+                unitY: "Aylık Gelir (₺)",
+                bookRef: "Pozitif Güçlü İlişki",
+                data: [
+                    { label: "Grup A", x: 8, y: 18500 }, { label: "Grup B", x: 10, y: 22000 },
+                    { label: "Grup C", x: 12, y: 28000 }, { label: "Grup D", x: 14, y: 35000 },
+                    { label: "Grup E", x: 16, y: 44000 }, { label: "Grup F", x: 18, y: 56000 },
+                    { label: "Grup G", x: 9, y: 20000 }, { label: "Grup H", x: 11, y: 25000 },
+                    { label: "Grup I", x: 15, y: 39000 }, { label: "Grup J", x: 17, y: 50000 }
+                ]
+            },
+            {
+                id: 3,
+                title: "3. Örnek: Hane Büyüklüğü ve Kitap Okuma Sayısı",
+                desc: "Ailedeki birey sayısı ile yıllık okunan kitap sayısı arasındaki ilişkinin incelenmesi.",
+                unitX: "Hane Büyüklüğü (Kişi)",
+                unitY: "Yıllık Kitap Sayısı",
+                bookRef: "Pozitif Zayıf İlişki",
+                data: [
+                    { label: "Aile 1", x: 2, y: 8 }, { label: "Aile 2", x: 3, y: 15 },
+                    { label: "Aile 3", x: 4, y: 6 }, { label: "Aile 4", x: 5, y: 12 },
+                    { label: "Aile 5", x: 6, y: 10 }, { label: "Aile 6", x: 7, y: 18 },
+                    { label: "Aile 7", x: 3, y: 5 }, { label: "Aile 8", x: 4, y: 14 },
+                    { label: "Aile 9", x: 5, y: 8 }, { label: "Aile 10", x: 8, y: 11 }
+                ]
+            },
+            {
+                id: 4,
+                title: "4. Örnek: Araç Yaşı ve İkinci El Satış Fiyatı",
+                desc: "Araç yaşı (yıl) ile piyasa satış değerleri (Bin TL) arasındaki ilişkinin incelenmesi.",
+                unitX: "Araç Yaşı (Yıl)",
+                unitY: "Satış Fiyatı (Bin ₺)",
+                bookRef: "Negatif Güçlü İlişki",
+                data: [
+                    { label: "Araç 1", x: 1, y: 1200 }, { label: "Araç 2", x: 3, y: 950 },
+                    { label: "Araç 3", x: 5, y: 780 }, { label: "Araç 4", x: 7, y: 600 },
+                    { label: "Araç 5", x: 10, y: 420 }, { label: "Araç 6", x: 12, y: 310 },
+                    { label: "Araç 7", x: 2, y: 1080 }, { label: "Araç 8", x: 6, y: 690 },
+                    { label: "Araç 9", x: 8, y: 530 }, { label: "Araç 10", x: 14, y: 220 }
+                ]
+            },
+            {
+                id: 5,
+                title: "5. Örnek: Rakım ve Yıllık Ortalama Sıcaklık",
+                desc: "Yerleşim yerlerinin deniz seviyesinden yüksekliği (m) ile yıllık ortalama sıcaklığı (°C) arasındaki ilişki.",
+                unitX: "Rakım / Yükseklik (m)",
+                unitY: "Ortalama Sıcaklık (°C)",
+                bookRef: "Negatif Orta İlişki",
+                data: [
+                    { label: "Bölge A", x: 10, y: 18.5 }, { label: "Bölge B", x: 300, y: 15.0 },
+                    { label: "Bölge C", x: 600, y: 14.2 }, { label: "Bölge D", x: 900, y: 10.5 },
+                    { label: "Bölge E", x: 1200, y: 11.8 }, { label: "Bölge F", x: 1700, y: 6.5 },
+                    { label: "Bölge G", x: 200, y: 17.1 }, { label: "Bölge H", x: 800, y: 12.0 },
+                    { label: "Bölge I", x: 1100, y: 8.9 }, { label: "Bölge J", x: 1500, y: 7.2 }
+                ]
+            },
+            {
+                id: 6,
+                title: "6. Örnek: Ekran Süresi ve Uyku Kalitesi",
+                desc: "Bireylerin günlük telefon ekran süreleri (saat) ile uyku kalitesi puanları arasındaki ilişki.",
+                unitX: "Ekran Süresi (Saat)",
+                unitY: "Uyku Kalitesi (0-100)",
+                bookRef: "Negatif Zayıf İlişki",
+                data: [
+                    { label: "Kişi 1", x: 2, y: 85 }, { label: "Kişi 2", x: 3, y: 70 },
+                    { label: "Kişi 3", x: 4, y: 90 }, { label: "Kişi 4", x: 5, y: 60 },
+                    { label: "Kişi 5", x: 6, y: 75 }, { label: "Kişi 6", x: 7, y: 50 },
+                    { label: "Kişi 7", x: 3, y: 80 }, { label: "Kişi 8", x: 5, y: 55 },
+                    { label: "Kişi 9", x: 8, y: 65 }, { label: "Kişi 10", x: 9, y: 40 }
+                ]
+            },
+            {
+                id: 7,
+                title: "7. Örnek: Ayakkabı Numarası ve Matematik Puanı",
+                desc: "Öğrencilerin ayakkabı numarası ile matematik dersi başarı puanı arasındaki ilişki.",
+                unitX: "Ayakkabı Numarası",
+                unitY: "Matematik Puanı",
+                bookRef: "İlişki Yok (r ≈ 0.00)",
+                data: [
+                    { label: "Öğr A", x: 36, y: 85 }, { label: "Öğr B", x: 38, y: 45 },
+                    { label: "Öğr C", x: 39, y: 92 }, { label: "Öğr D", x: 41, y: 30 },
+                    { label: "Öğr E", x: 42, y: 78 }, { label: "Öğr F", x: 43, y: 60 },
+                    { label: "Öğr G", x: 37, y: 95 }, { label: "Öğr H", x: 40, y: 50 },
+                    { label: "Öğr I", x: 42, y: 88 }, { label: "Öğr J", x: 44, y: 40 }
+                ]
+            },
+            {
+                id: 8,
+                title: "8. Örnek: Sanayi Üretimi ve İhracat Tutarı",
+                desc: "Aylık üretim endeksi ile toplam ihracat miktarı arasındaki ilişkinin incelenmesi.",
+                unitX: "Üretim Endeksi",
+                unitY: "İhracat (Milyon $)",
+                bookRef: "Pozitif Güçlü İlişki",
+                data: [
+                    { label: "Ocak", x: 102, y: 1450 }, { label: "Şubat", x: 105, y: 1520 },
+                    { label: "Mart", x: 110, y: 1680 }, { label: "Nisan", x: 115, y: 1790 },
+                    { label: "Mayıs", x: 122, y: 1950 }, { label: "Haziran", x: 128, y: 2100 },
+                    { label: "Temmuz", x: 108, y: 1600 }, { label: "Ağustos", x: 118, y: 1850 },
+                    { label: "Eylül", x: 125, y: 2020 }, { label: "Ekim", x: 132, y: 2200 }
+                ]
+            },
+            {
+                id: 9,
+                title: "9. Örnek: Konut Satışı ve Çimento Üretimi",
+                desc: "Aylık konut satış sayısı ile inşaat çimento üretimi (Bin Ton) arasındaki ilişki.",
+                unitX: "Konut Satışı (Adet)",
+                unitY: "Çimento Üretimi (Bin Ton)",
+                bookRef: "Pozitif Güçlü İlişki",
+                data: [
+                    { label: "Ocak", x: 1200, y: 350 }, { label: "Şubat", x: 1450, y: 410 },
+                    { label: "Mart", x: 1800, y: 520 }, { label: "Nisan", x: 2100, y: 600 },
+                    { label: "Mayıs", x: 2500, y: 710 }, { label: "Haziran", x: 2900, y: 830 },
+                    { label: "Temmuz", x: 1600, y: 460 }, { label: "Ağustos", x: 2300, y: 650 },
+                    { label: "Eylül", x: 2700, y: 780 }, { label: "Ekim", x: 3100, y: 890 }
+                ]
+            },
+            {
+                id: 10,
+                title: "10. Örnek: Doğum Oranı ve İnternet Aboneliği",
+                desc: "Bölgelerin doğum hızı (‰) ile internet abonelik oranları (%) arasındaki ilişki.",
+                unitX: "Doğum Hızı (‰)",
+                unitY: "İnternet Abonesi (%)",
+                bookRef: "İlişki Yok (r ≈ 0.00)",
+                data: [
+                    { label: "Bölge 1", x: 11, y: 72 }, { label: "Bölge 2", x: 18, y: 45 },
+                    { label: "Bölge 3", x: 13, y: 85 }, { label: "Bölge 4", x: 22, y: 60 },
+                    { label: "Bölge 5", x: 15, y: 35 }, { label: "Bölge 6", x: 20, y: 80 },
+                    { label: "Bölge 7", x: 12, y: 50 }, { label: "Bölge 8", x: 17, y: 90 },
+                    { label: "Bölge 9", x: 14, y: 65 }, { label: "Bölge 10", x: 19, y: 30 }
+                ]
+            }
+        ];
+
+        let currentIndex = 0;
+        let chartInstance = null;
+
+        window.onload = function() {
+            buildDropdownMenu();
+            loadExample(0);
+        };
+
+        function toggleDropdown() {
+            document.getElementById("dropdown-list").classList.toggle("open");
+        }
+
+        function buildDropdownMenu() {
+            const list = document.getElementById("dropdown-list");
+            list.innerHTML = "";
+            examples.forEach((ex, idx) => {
+                const item = document.createElement("div");
+                item.className = "dropdown-item";
+                item.innerText = ex.title;
+                item.onclick = function() {
+                    loadExample(idx);
+                    toggleDropdown();
+                };
+                list.appendChild(item);
+            });
+        }
+
+        function loadExample(index) {
+            currentIndex = index;
+            const ex = examples[index];
+
+            document.getElementById("ex-title").innerText = ex.title;
+            document.getElementById("ex-desc").innerText = ex.desc;
+            document.getElementById("th-x").innerText = `${ex.unitX} [X]`;
+            document.getElementById("th-y").innerText = `${ex.unitY} [Y]`;
+
+            const tbody = document.querySelector("#data-table tbody");
+            tbody.innerHTML = "";
+            ex.data.forEach(p => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `<td><strong>${p.label}</strong></td><td>${p.x}</td><td>${p.y}</td>`;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById("chart-panel").classList.add("invisible-panel");
+            document.getElementById("calc-output").classList.remove("visible");
+            document.getElementById("bso-card").style.display = "none";
+            document.getElementById("chart-title-text").innerText = "📊 Serpme Diyagramı (Saçılım Grafiği)";
+        }
+
+        function enableScatterPlot(showMeans = false) {
+            const chartPanel = document.getElementById("chart-panel");
+            chartPanel.classList.remove("invisible-panel");
+
+            renderChart(showMeans);
+        }
+
+        function renderChart(showMeans = false) {
+            const ex = examples[currentIndex];
+            const points = ex.data.map(p => ({ x: p.x, y: p.y }));
+            const ctx = document.getElementById('scatterChart').getContext('2d');
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            const meanX = ex.data.reduce((acc, p) => acc + p.x, 0) / ex.data.length;
+            const meanY = ex.data.reduce((acc, p) => acc + p.y, 0) / ex.data.length;
+
+            const annotations = {};
+            if (showMeans) {
+                annotations.lineX = {
+                    type: 'line',
+                    xMin: meanX,
+                    xMax: meanX,
+                    borderColor: '#ef4444',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    label: {
+                        display: true,
+                        content: `x̄ = ${meanX.toFixed(1)}`,
+                        position: 'start',
+                        backgroundColor: '#ef4444',
+                        color: 'white',
+                        font: { size: 10 }
+                    }
+                };
+                annotations.lineY = {
+                    type: 'line',
+                    yMin: meanY,
+                    yMax: meanY,
+                    borderColor: '#ef4444',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    label: {
+                        display: true,
+                        content: `Ȳ = ${meanY.toFixed(1)}`,
+                        position: 'end',
+                        backgroundColor: '#ef4444',
+                        color: 'white',
+                        font: { size: 10 }
+                    }
+                };
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Noktalar (x, y)',
+                        data: points,
+                        backgroundColor: '#d97706',
+                        borderColor: '#b45309',
+                        borderWidth: 2,
+                        pointRadius: 6,
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        annotation: {
+                            annotations: annotations
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: ex.unitX,
+                                color: '#1e293b',
+                                font: { weight: 'bold', size: 11 }
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: ex.unitY,
+                                color: '#1e293b',
+                                font: { weight: 'bold', size: 11 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function calculateCorrelation() {
+            enableScatterPlot(false);
+            const ex = examples[currentIndex];
+            const n = ex.data.length;
+
+            let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+            ex.data.forEach(p => {
+                sumX += p.x; sumY += p.y;
+                sumXY += (p.x * p.y);
+                sumX2 += (p.x * p.x); sumY2 += (p.y * p.y);
+            });
+
+            const num = (n * sumXY) - (sumX * sumY);
+            const den = Math.sqrt(((n * sumX2) - (sumX * sumX)) * ((n * sumY2) - (sumY * sumY)));
+            const r = (num / den).toFixed(2);
+
+            let interpretation = "";
+            if (r >= 0.8) interpretation = "Değişkenler arasında <strong>güçlü pozitif</strong> bir ilişki vardır.";
+            else if (r >= 0.5) interpretation = "Değişkenler arasında <strong>orta düzeyde pozitif</strong> bir ilişki vardır.";
+            else if (r >= 0.2) interpretation = "Değişkenler arasında <strong>zayıf pozitif</strong> bir ilişki vardır.";
+            else if (r <= -0.8) interpretation = "Değişkenler arasında <strong>güçlü negatif</strong> bir ilişki vardır.";
+            else if (r <= -0.5) interpretation = "Değişkenler arasında <strong>orta düzeyde negatif</strong> bir ilişki vardır.";
+            else if (r <= -0.2) interpretation = "Değişkenler arasında <strong>zayıf negatif</strong> bir ilişki vardır.";
+            else interpretation = "İki değişken arasında <strong>ilişki yoktur</strong>.";
+
+            document.getElementById("r-val").innerText = `Pearson Korelasyonu (r): ${r}`;
+            document.getElementById("r-desc").innerHTML = interpretation;
+            document.getElementById("bso-card").style.display = "none";
+
+            document.getElementById("calc-output").classList.add("visible");
+            document.getElementById("chart-title-text").innerText = "📊 Serpme Diyagramı (Saçılım Grafiği)";
+        }
+
+        function calculateBSO() {
+            enableScatterPlot(true);
+            const ex = examples[currentIndex];
+            const n = ex.data.length;
+
+            const meanX = ex.data.reduce((acc, p) => acc + p.x, 0) / n;
+            const meanY = ex.data.reduce((acc, p) => acc + p.y, 0) / n;
+
+            let n1 = 0, n2 = 0, n3 = 0, n4 = 0;
+
+            ex.data.forEach(p => {
+                if (p.x > meanX && p.y > meanY) n1++;
+                else if (p.x < meanX && p.y > meanY) n2++;
+                else if (p.x < meanX && p.y < meanY) n3++;
+                else if (p.x > meanX && p.y < meanY) n4++;
+            });
+
+            const bsoNum = (n1 + n3) - (n2 + n4);
+            const bso = (bsoNum / n).toFixed(2);
+
+            let interpretation = "";
+            if (bso > 0.5) interpretation = "BSO sonucu <strong>güçlü pozitif yönlü</strong> bir ilişkiyi göstermektedir.";
+            else if (bso > 0) interpretation = "BSO sonucu <strong>pozitif yönlü</strong> bir ilişkiyi göstermektedir.";
+            else if (bso < -0.5) interpretation = "BSO sonucu <strong>güçlü negatif yönlü</strong> bir ilişkiyi göstermektedir.";
+            else if (bso < 0) interpretation = "BSO sonucu <strong>negatif yönlü</strong> bir ilişkiyi göstermektedir.";
+            else interpretation = "Değişkenler arasında <strong>ilişki yoktur</strong>.";
+
+            document.getElementById("r-val").innerText = `BSO Katsayısı: ${bso}`;
+            document.getElementById("r-desc").innerHTML = interpretation;
+            
+            const bsoCard = document.getElementById("bso-card");
+            bsoCard.style.display = "flex";
+            bsoCard.innerHTML = `
+                <div class="bso-means">x̄ = ${meanX.toFixed(1)}, Ȳ = ${meanY.toFixed(1)}</div>
+                <div class="region-grid">
+                    <div class="region-badge">1. Bölge: <b>${n1}</b></div>
+                    <div class="region-badge">2. Bölge: <b>${n2}</b></div>
+                    <div class="region-badge">3. Bölge: <b>${n3}</b></div>
+                    <div class="region-badge">4. Bölge: <b>${n4}</b></div>
+                </div>
+                <div class="formula-box">
+                    [(${n1} + ${n3}) - (${n2} + ${n4})] / ${n} = ${bso}
+                </div>
+            `;
+
+            document.getElementById("calc-output").classList.add("visible");
+            document.getElementById("chart-title-text").innerText = "📊 Serpme Diyagramı + Ortalamalar Ekseni";
+        }
+    </script>
+</body>
+</html>
